@@ -15,8 +15,10 @@ def _get_orchestrator():
     from src.models.llm import get_client
     from src.knowledge.store import KnowledgeStore
     from src.orchestrator.router import Orchestrator
+    from src.utils.config import models_config
 
-    client = get_client()
+    provider = models_config().get("provider", "gemini")
+    client = get_client(provider)
     store = KnowledgeStore()
     return Orchestrator(client=client, store=store)
 

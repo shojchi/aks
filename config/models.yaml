@@ -1,31 +1,39 @@
+provider: "gemini"  # "gemini" | "anthropic" — switch here to change globally
+
 models:
   orchestrator:
-    model: "claude-haiku-4-5-20251001"
+    model: "gemini-2.0-flash-lite"
     max_tokens: 512
     temperature: 0.0         # deterministic routing
 
   code:
-    model: "claude-sonnet-4-6"
+    model: "gemini-2.0-flash"
     max_tokens: 4096
     temperature: 0.2
 
   pkm:
-    model: "claude-sonnet-4-6"
+    model: "gemini-2.0-flash"
     max_tokens: 4096
     temperature: 0.4
 
   writing:
-    model: "claude-sonnet-4-6"
+    model: "gemini-2.0-flash"
     max_tokens: 4096
     temperature: 0.6
 
   planning:
-    model: "claude-haiku-4-5-20251001"
+    model: "gemini-2.0-flash-lite"
     max_tokens: 2048
     temperature: 0.1
 
   # Phase 2: embeddings
   embeddings:
-    model: "text-embedding-3-small"
-    provider: "openai"
-    dimensions: 1536
+    model: "text-embedding-004"
+    provider: "gemini"
+    dimensions: 768
+
+# --- Anthropic equivalents (swap provider above to use) ---
+# orchestrator: claude-haiku-4-5-20251001
+# code/pkm/writing: claude-sonnet-4-6
+# planning: claude-haiku-4-5-20251001
+# embeddings: text-embedding-3-small (provider: openai)

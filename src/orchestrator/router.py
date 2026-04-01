@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import uuid
-
-import anthropic
+from typing import Any
 
 from src.agents.base import AgentMessage, AgentResponse, BaseAgent
 from src.agents.code_agent import CodeAgent
@@ -44,14 +43,17 @@ def _build_routing_system() -> str:
 
 
 class Orchestrator:
-    def __init__(self, client: anthropic.Anthropic, store: KnowledgeStore) -> None:
+    def __init__(self, client: Any, store: KnowledgeStore) -> None:
         self.client = client
         self.store = store
-        m = models_config()["orchestrator"]
+        cfg = models_config()
+        m = cfg["orchestrator"]
+        provider = cfg.get("provider", "gemini")
         self._routing_config = ModelConfig(
             model=m["model"],
             max_tokens=m["max_tokens"],
             temperature=m["temperature"],
+            provider=provider,
         )
         self._agents: dict[str, BaseAgent] = {
             name: cls(client) for name, cls in ACTIVE_AGENTS.items()

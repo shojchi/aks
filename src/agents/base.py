@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-
-import anthropic
+from typing import Any
 
 from src.models.llm import ModelConfig, complete
 from src.utils.config import agent_config, models_config
@@ -33,14 +32,17 @@ class AgentResponse:
 class BaseAgent:
     name: str = "base"
 
-    def __init__(self, client: anthropic.Anthropic) -> None:
+    def __init__(self, client: Any) -> None:
         self.client = client
         self._agent_cfg = agent_config(self.name)
-        m = models_config()[self.name]
+        cfg = models_config()
+        m = cfg[self.name]
+        provider = cfg.get("provider", "gemini")
         self.model_config = ModelConfig(
             model=m["model"],
             max_tokens=m["max_tokens"],
             temperature=m["temperature"],
+            provider=provider,
         )
 
     def run(self, msg: AgentMessage) -> AgentResponse:
