@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from src.utils.config import system_config
+from aks.utils.config import system_config, PROJECT_ROOT
 
 
 @dataclass
@@ -48,8 +48,8 @@ def _parse_note(path: Path) -> Note:
 class KnowledgeStore:
     def __init__(self) -> None:
         cfg = system_config()
-        self.notes_dir = Path(cfg["notes_dir"])
-        self.index_dir = Path(cfg["index_dir"])
+        self.notes_dir = PROJECT_ROOT / cfg["notes_dir"]
+        self.index_dir = PROJECT_ROOT / cfg["index_dir"]
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self._db = self._open_db()
         self._sync()

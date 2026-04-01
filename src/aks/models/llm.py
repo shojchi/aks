@@ -15,45 +15,38 @@ class ModelConfig:
 
 
 # ---------------------------------------------------------------------------
-# Gemini
+# Gemini (google-genai SDK)
 # ---------------------------------------------------------------------------
 
 def _gemini_client() -> Any:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise EnvironmentError("GEMINI_API_KEY is not set")
-    import google.generativeai as genai
-    genai.configure(api_key=api_key)
-    return genai
+    from google import genai
+    return genai.Client(api_key=api_key)
 
 
-def _gemini_complete(genai: Any, config: ModelConfig, system: str, messages: list[dict]) -> str:
-    import google.generativeai as genai_module
+def _gemini_complete(client: Any, config: ModelConfig, system: str, messages: list[dict]) -> str:
+    from google.genai import types
 
-    model = genai_module.GenerativeModel(
-        model_name=config.model,
-        system_instruction=system,
-        generation_config=genai_module.GenerationConfig(
+    # Convert messages to Gemini Content format
+    # Gemini uses "model" instead of "assistant"
+    contents = []
+    for msg in messages:
+        role = "model" if msg["role"] == "assistant" else msg["role"]
+        contents.append(
+            types.Content(role=role, parts=[types.Part(text=msg["content"])])
+        )
+
+    response = client.models.generate_content(
+        model=config.model,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system,
             max_output_tokens=config.max_tokens,
             temperature=config.temperature,
         ),
     )
-
-    # Convert Anthropic-style messages to Gemini history format
-    # Gemini uses "model" instead of "assistant"
-    history = []
-    for msg in messages[:-1]:
-        role = "model" if msg["role"] == "assistant" else msg["role"]
-        history.append({"role": role, "parts": [msg["content"]]})
-
-    last_message = messages[-1]["content"] if messages else ""
-
-    if history:
-        chat = model.start_chat(history=history)
-        response = chat.send_message(last_message)
-    else:
-        response = model.generate_content(last_message)
-
     return response.text
 
 

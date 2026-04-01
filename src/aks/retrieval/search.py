@@ -1,8 +1,8 @@
 """Assemble retrieved context for agent prompts."""
 from __future__ import annotations
 
-from src.knowledge.store import KnowledgeStore, SearchResult
-from src.utils.config import system_config
+from aks.knowledge.store import KnowledgeStore, SearchResult
+from aks.utils.config import system_config
 
 
 def retrieve_context(query: str, store: KnowledgeStore) -> str:

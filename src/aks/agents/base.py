@@ -4,8 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.models.llm import ModelConfig, complete
-from src.utils.config import agent_config, models_config
+from aks.models.llm import ModelConfig, complete
+from aks.utils.config import agent_config, models_config, get_provider
 
 
 @dataclass
@@ -37,7 +37,7 @@ class BaseAgent:
         self._agent_cfg = agent_config(self.name)
         cfg = models_config()
         m = cfg[self.name]
-        provider = cfg.get("provider", "gemini")
+        provider = get_provider()
         self.model_config = ModelConfig(
             model=m["model"],
             max_tokens=m["max_tokens"],

@@ -2,9 +2,6 @@
 """AKS — Agent Knowledge System CLI."""
 from __future__ import annotations
 
-import os
-import sys
-
 import click
 from dotenv import load_dotenv
 
@@ -12,29 +9,26 @@ load_dotenv()
 
 
 def _get_orchestrator():
-    from src.models.llm import get_client
-    from src.knowledge.store import KnowledgeStore
-    from src.orchestrator.router import Orchestrator
-    from src.utils.config import models_config
+    from aks.models.llm import get_client
+    from aks.knowledge.store import KnowledgeStore
+    from aks.orchestrator.router import Orchestrator
+    from aks.utils.config import get_provider
 
-    provider = models_config().get("provider", "gemini")
-    client = get_client(provider)
+    client = get_client(get_provider())
     store = KnowledgeStore()
     return Orchestrator(client=client, store=store)
 
 
-@click.group(invoke_without_command=True)
-@click.argument("query", required=False)
-@click.option("--agent", "-a", default=None, help="Force a specific agent (e.g. code)")
-@click.pass_context
-def cli(ctx: click.Context, query: str | None, agent: str | None) -> None:
-    """AKS — ask your personal AI assistant."""
-    if ctx.invoked_subcommand is not None:
-        return
-    if not query:
-        click.echo(ctx.get_help())
-        return
+@click.group()
+def cli() -> None:
+    """AKS — your personal AI assistant grounded in your notes."""
 
+
+@cli.command()
+@click.argument("query")
+@click.option("--agent", "-a", default=None, help="Force a specific agent (e.g. code)")
+def ask(query: str, agent: str | None) -> None:
+    """Ask a question. Usage: aks ask 'why is my code slow?'"""
     orchestrator = _get_orchestrator()
     response = orchestrator.run(query, force_agent=agent)
 
@@ -50,14 +44,14 @@ def cli(ctx: click.Context, query: str | None, agent: str | None) -> None:
 @cli.command()
 def status() -> None:
     """Show loaded agents, models, and config."""
-    from src.utils.config import system_config, models_config
-    from src.orchestrator.router import ACTIVE_AGENTS
+    from aks.utils.config import system_config, models_config, get_provider
+    from aks.orchestrator.router import ACTIVE_AGENTS
 
     sys_cfg = system_config()
     mdl_cfg = models_config()
 
     click.echo("\n=== AKS Status ===")
-    click.echo(f"Version : {sys_cfg.get('version', '?')}")  # fallback if missing
+    click.echo(f"Provider: {get_provider()}")
     click.echo(f"Notes   : {sys_cfg['notes_dir']}")
     click.echo(f"Embeds  : {'enabled' if sys_cfg['retrieval']['embeddings_enabled'] else 'disabled (Phase 1)'}")
     click.echo(f"Daily $ : ${sys_cfg['cost']['daily_cap_usd']:.2f} cap")
@@ -71,8 +65,8 @@ def status() -> None:
 @click.argument("title")
 @click.argument("body")
 def save(title: str, body: str) -> None:
-    """Save a note to the knowledge store. Usage: aks save 'Title' 'Body text'"""
-    from src.knowledge.store import KnowledgeStore
+    """Save a note. Usage: aks save 'Title' 'Body text'"""
+    from aks.knowledge.store import KnowledgeStore
 
     store = KnowledgeStore()
     path = store.save_note(title=title, body=body)
@@ -82,8 +76,8 @@ def save(title: str, body: str) -> None:
 @cli.command()
 @click.argument("query")
 def search(query: str) -> None:
-    """Search notes with keyword search. Usage: aks search 'query'"""
-    from src.knowledge.store import KnowledgeStore
+    """Search notes. Usage: aks search 'query'"""
+    from aks.knowledge.store import KnowledgeStore
 
     store = KnowledgeStore()
     results = store.search(query)

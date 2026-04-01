@@ -7,7 +7,8 @@ from pathlib import Path
 import yaml
 
 
-CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+CONFIG_DIR = PROJECT_ROOT / "config"
 
 
 @functools.lru_cache(maxsize=None)
@@ -22,6 +23,10 @@ def system_config() -> dict:
 
 def models_config() -> dict:
     return load_yaml(CONFIG_DIR / "models.yaml")["models"]
+
+
+def get_provider() -> str:
+    return load_yaml(CONFIG_DIR / "models.yaml").get("provider", "gemini")
 
 
 def agent_config(name: str) -> dict:

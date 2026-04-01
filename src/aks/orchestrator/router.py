@@ -4,12 +4,12 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from src.agents.base import AgentMessage, AgentResponse, BaseAgent
-from src.agents.code_agent import CodeAgent
-from src.models.llm import ModelConfig, complete
-from src.retrieval.search import retrieve_context
-from src.knowledge.store import KnowledgeStore
-from src.utils.config import models_config
+from aks.agents.base import AgentMessage, AgentResponse, BaseAgent
+from aks.agents.code_agent import CodeAgent
+from aks.models.llm import ModelConfig, complete
+from aks.retrieval.search import retrieve_context
+from aks.knowledge.store import KnowledgeStore
+from aks.utils.config import models_config, get_provider
 
 # Phase 1: only code agent is active
 ACTIVE_AGENTS: dict[str, type[BaseAgent]] = {
@@ -30,7 +30,7 @@ Agent descriptions:
 
 
 def _build_routing_system() -> str:
-    from src.utils.config import agent_config
+    from aks.utils.config import agent_config
     descs = "\n".join(
         f"- {name}: {agent_config(name)['description']}"
         for name in ACTIVE_AGENTS
@@ -48,7 +48,7 @@ class Orchestrator:
         self.store = store
         cfg = models_config()
         m = cfg["orchestrator"]
-        provider = cfg.get("provider", "gemini")
+        provider = get_provider()
         self._routing_config = ModelConfig(
             model=m["model"],
             max_tokens=m["max_tokens"],
