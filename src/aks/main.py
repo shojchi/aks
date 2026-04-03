@@ -2,19 +2,23 @@
 """AKS — Agent Knowledge System CLI."""
 from __future__ import annotations
 
+import os as _os
+
 import click
 from dotenv import load_dotenv
 
-import os as _os
 load_dotenv(_os.environ.get("AKS_HOME", ".") + "/.env")
 
 
 def _get_orchestrator():
+    from aks.models.llm import get_client
     from aks.knowledge.store import KnowledgeStore
     from aks.orchestrator.router import Orchestrator
+    from aks.utils.config import get_provider
 
+    client = get_client(get_provider())
     store = KnowledgeStore()
-    return Orchestrator(store=store)
+    return Orchestrator(client=client, store=store)
 
 
 @click.group()
@@ -28,42 +32,38 @@ def cli() -> None:
 def ask(query: str, agent: str | None) -> None:
     """Ask a question. Usage: aks ask 'why is my code slow?'"""
     orchestrator = _get_orchestrator()
-    response = orchestrator.run(query, force_agent=agent)
+    agent_name, model, chunks, sources = orchestrator.stream(query, force_agent=agent)
 
-    click.echo(f"\n[{response.agent} | {response.model_used}]\n")
-    click.echo(response.content)
+    click.echo(f"\n[{agent_name} | {model}]\n")
+    for chunk in chunks:
+        click.echo(chunk, nl=False)
+    click.echo("\n")
 
-    if response.sources_used:
-        click.echo("\n--- Sources ---")
-        for src in response.sources_used:
+    if sources:
+        click.echo("--- Sources ---")
+        for src in sources:
             click.echo(f"  • {src.strip()}")
 
 
 @cli.command()
 def status() -> None:
     """Show loaded agents, models, and config."""
-    from aks.utils.config import system_config, models_config, get_fallback_chain
+    from aks.utils.config import system_config, models_config, get_provider
     from aks.orchestrator.router import ACTIVE_AGENTS
 
     sys_cfg = system_config()
     mdl_cfg = models_config()
-    chain = get_fallback_chain()
 
     click.echo("\n=== AKS Status ===")
+    click.echo(f"Provider: {get_provider()}")
     click.echo(f"Notes   : {sys_cfg['notes_dir']}")
     embed_model = mdl_cfg.get("embeddings", {}).get("model", "?") if sys_cfg["retrieval"]["embeddings_enabled"] else None
     click.echo(f"Embeds  : {'enabled (' + embed_model + ')' if embed_model else 'disabled'}")
     click.echo(f"Daily $ : ${sys_cfg['cost']['daily_cap_usd']:.2f} cap")
-    click.echo("\nProvider fallback chain:")
-    for i, p in enumerate(chain, 1):
-        import os
-        has_key = bool(os.getenv(p["api_key_env"], ""))
-        status = "✓" if has_key else "✗ no key"
-        click.echo(f"  {i}. {p['name']:<10} {p['model']:<30} [{status}]")
     click.echo("\nActive agents:")
     for name in ACTIVE_AGENTS:
         m = mdl_cfg.get(name, {})
-        click.echo(f"  • {name:<10} max_tokens={m.get('max_tokens', '?')}  temp={m.get('temperature', '?')}")
+        click.echo(f"  • {name:<10} {m.get('model', '?')}  (temp={m.get('temperature', '?')})")
 
 
 @cli.command()
@@ -114,12 +114,17 @@ def chat() -> None:
     click.echo("AKS Chat — type your message. Ctrl+C to exit.\n")
     while True:
         query = click.prompt("you")
-        response = orchestrator.run(query, conversation_history=history)
+        agent_name, _, chunks, _ = orchestrator.stream(query, conversation_history=history)
 
-        click.echo(f"\n[{response.agent}] {response.content}\n")
+        click.echo(f"\n[{agent_name}] ", nl=False)
+        content = ""
+        for chunk in chunks:
+            click.echo(chunk, nl=False)
+            content += chunk
+        click.echo("\n")
 
         history.append({"role": "user", "content": query})
-        history.append({"role": "assistant", "content": response.content})
+        history.append({"role": "assistant", "content": content})
 
 
 @cli.command(name="list")

@@ -32,5 +32,9 @@ def get_fallback_chain() -> list[dict]:
     return load_yaml(CONFIG_DIR / "models.yaml").get("fallback_chain", [])
 
 
+def get_provider() -> str:
+    return load_yaml(CONFIG_DIR / "models.yaml").get("provider", "gemini")
+
+
 def agent_config(name: str) -> dict:
     return load_yaml(CONFIG_DIR / "agents" / f"{name}.yaml")

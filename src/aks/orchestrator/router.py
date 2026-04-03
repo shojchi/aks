@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, Iterator
 
 from aks.agents.base import AgentMessage, AgentResponse, BaseAgent
 from aks.agents.code_agent import CodeAgent
@@ -9,8 +10,9 @@ from aks.agents.pkm_agent import PKMAgent
 from aks.agents.writing_agent import WritingAgent
 from aks.agents.planning_agent import PlanningAgent
 from aks.knowledge.store import KnowledgeStore
+from aks.models.llm import ModelConfig, complete
 from aks.retrieval.search import retrieve_context
-from aks.utils.config import models_config, agent_config
+from aks.utils.config import models_config, agent_config, get_provider
 
 ACTIVE_AGENTS: dict[str, type[BaseAgent]] = {
     "code": CodeAgent,
@@ -74,7 +76,6 @@ def _keyword_route(query: str) -> str | None:
                 scores[name] += 1
     best_name = max(scores, key=lambda n: scores[n])
     best_score = scores[best_name]
-    # Only trust keyword routing when there's a clear winner
     if best_score >= 2:
         return best_name
     rivals = [n for n, s in scores.items() if s == best_score and n != best_name]
@@ -84,13 +85,20 @@ def _keyword_route(query: str) -> str | None:
 
 
 class Orchestrator:
-    def __init__(self, store: KnowledgeStore) -> None:
+    def __init__(self, client: Any, store: KnowledgeStore) -> None:
+        self.client = client
         self.store = store
-        m = models_config()["orchestrator"]
-        self._routing_max_tokens: int = m["max_tokens"]
-        self._routing_temperature: float = m["temperature"]
+        cfg = models_config()
+        m = cfg["orchestrator"]
+        provider = get_provider()
+        self._routing_config = ModelConfig(
+            model=m["model"],
+            max_tokens=m["max_tokens"],
+            temperature=m["temperature"],
+            provider=provider,
+        )
         self._agents: dict[str, BaseAgent] = {
-            name: cls() for name, cls in ACTIVE_AGENTS.items()
+            name: cls(client) for name, cls in ACTIVE_AGENTS.items()
         }
         self._routing_system = _build_routing_system()
 
@@ -100,18 +108,15 @@ class Orchestrator:
             return force_agent
         if len(self._agents) == 1:
             return DEFAULT_AGENT
-        # Fast path: keyword match before spending an LLM call
         keyword_pick = _keyword_route(query)
         if keyword_pick:
             return keyword_pick
-        from aks.models.llm import complete_with_fallback
-        raw, _ = complete_with_fallback(
+        raw = complete(
+            self.client,
+            self._routing_config,
             self._routing_system,
             [{"role": "user", "content": query}],
-            self._routing_max_tokens,
-            self._routing_temperature,
-        )
-        raw = raw.strip().lower()
+        ).strip().lower()
         return raw if raw in self._agents else DEFAULT_AGENT
 
     def run(
@@ -131,3 +136,27 @@ class Orchestrator:
             conversation_history=conversation_history or [],
         )
         return self._agents[agent_name].run(msg)
+
+    def stream(
+        self,
+        query: str,
+        conversation_history: list[dict] | None = None,
+        force_agent: str | None = None,
+    ) -> tuple[str, str, Iterator[str], list[str]]:
+        """Route the query and stream the response.
+
+        Returns (agent_name, model, chunk_iterator, sources).
+        Routing is still a blocking call; only the agent response streams.
+        """
+        agent_name = self.route(query, force_agent)
+        context = retrieve_context(query, self.store)
+        msg = AgentMessage(
+            message_id=str(uuid.uuid4()),
+            sender="orchestrator",
+            receiver=agent_name,
+            query=query,
+            context=context,
+            conversation_history=conversation_history or [],
+        )
+        chunks, sources = self._agents[agent_name].stream(msg)
+        return agent_name, self._agents[agent_name].model_config.model, chunks, sources
