@@ -153,10 +153,25 @@ class TestReindex:
         results = store.search("zeptogram")
         assert len(results) == 1
 
-    def test_reindex_removes_missing_files(self, store):
-        path = store.save_note("Temporary", "here today")
+    def test_reindex_removes_missing_files(self, tmp_path, monkeypatch):
+        # Use auto_sync=False to mirror the real CLI — otherwise __init__ _sync()
+        # removes the orphan before reindex() gets a chance to count it.
+        notes_dir = tmp_path / "notes"
+        index_dir = tmp_path / ".index"
+        notes_dir.mkdir()
+        index_dir.mkdir()
+        cfg = {"notes_dir": "notes", "index_dir": ".index", "retrieval": {"embeddings_enabled": False}}
+        monkeypatch.setattr("aks.knowledge.store.system_config", lambda: cfg)
+        monkeypatch.setattr("aks.knowledge.store.PROJECT_ROOT", tmp_path)
+
+        # Save a note with a normal store (auto_sync=True)
+        s = KnowledgeStore()
+        path = s.save_note("Temporary", "here today")
         path.unlink()
-        stats = store.reindex()
+
+        # Re-open without auto_sync, then reindex — should see removed=1
+        store2 = KnowledgeStore(auto_sync=False)
+        stats = store2.reindex()
         assert stats.removed == 1
 
     def test_reindex_stats_str(self):

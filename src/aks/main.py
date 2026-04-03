@@ -80,7 +80,7 @@ def reindex() -> None:
     from aks.knowledge.store import KnowledgeStore
 
     click.echo("Scanning notes…")
-    store = KnowledgeStore()
+    store = KnowledgeStore(auto_sync=False)
     stats = store.reindex()
     click.echo(f"Done — {stats}")
 

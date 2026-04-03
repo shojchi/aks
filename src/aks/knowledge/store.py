@@ -57,7 +57,7 @@ def _parse_note(path: Path) -> Note:
 
 
 class KnowledgeStore:
-    def __init__(self) -> None:
+    def __init__(self, auto_sync: bool = True) -> None:
         cfg = system_config()
         self.notes_dir = PROJECT_ROOT / cfg["notes_dir"]
         self.index_dir = PROJECT_ROOT / cfg["index_dir"]
@@ -67,7 +67,8 @@ class KnowledgeStore:
         self._chroma: Any = None
         if self.embeddings_enabled:
             self._chroma = self._open_chroma()
-        self._sync()
+        if auto_sync:
+            self._sync()
 
     # ------------------------------------------------------------------
     # Setup
