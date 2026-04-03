@@ -75,6 +75,17 @@ def save(title: str, body: str) -> None:
 
 
 @cli.command()
+def reindex() -> None:
+    """Rebuild the search index, picking up edits and deletions on disk."""
+    from aks.knowledge.store import KnowledgeStore
+
+    click.echo("Scanning notes…")
+    store = KnowledgeStore()
+    stats = store.reindex()
+    click.echo(f"Done — {stats}")
+
+
+@cli.command()
 @click.argument("query")
 def search(query: str) -> None:
     """Search notes. Usage: aks search 'query'"""
