@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from aks.utils.config import system_config, PROJECT_ROOT
+from aks.utils.config import system_config, DATA_DIR
 
 
 @dataclass
@@ -49,8 +49,8 @@ def _parse_note(path: Path) -> Note:
 class KnowledgeStore:
     def __init__(self) -> None:
         cfg = system_config()
-        self.notes_dir = PROJECT_ROOT / cfg["notes_dir"]
-        self.index_dir = PROJECT_ROOT / cfg["index_dir"]
+        self.notes_dir = DATA_DIR / cfg["notes_dir"]
+        self.index_dir = DATA_DIR / cfg["index_dir"]
         self.embeddings_enabled: bool = cfg["retrieval"]["embeddings_enabled"]
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self._db = self._open_db()
@@ -118,8 +118,9 @@ class KnowledgeStore:
 
     def _embed(self, text: str) -> list[float]:
         from aks.models.llm import get_embedding
-        from aks.utils.config import get_provider
-        return get_embedding(text, provider=get_provider())
+        from aks.utils.config import models_config
+        embed_provider = models_config().get("embeddings", {}).get("provider", "gemini")
+        return get_embedding(text, provider=embed_provider)
 
     # ------------------------------------------------------------------
     # Search
@@ -167,6 +168,39 @@ class KnowledgeStore:
             score = max(0.0, 1.0 - dist / 2.0)
             out.append(SearchResult(note=note, snippet=doc[:300], score=score))
         return out
+
+    # ------------------------------------------------------------------
+    # List
+    # ------------------------------------------------------------------
+
+    def list_notes(self) -> list[Note]:
+        """Return all indexed notes sorted by title."""
+        rows = self._db.execute("SELECT path FROM notes ORDER BY title").fetchall()
+        notes = []
+        for (path_str,) in rows:
+            p = Path(path_str)
+            if p.exists():
+                notes.append(_parse_note(p))
+        return notes
+
+    # ------------------------------------------------------------------
+    # Delete
+    # ------------------------------------------------------------------
+
+    def delete_note(self, path: Path) -> None:
+        """Remove a note from disk, FTS index, and ChromaDB."""
+        key = str(path)
+
+        self._db.execute("DELETE FROM notes WHERE path = ?", (key,))
+        self._db.commit()
+
+        if self._chroma:
+            existing = self._chroma.get(ids=[key])
+            if existing["ids"]:
+                self._chroma.delete(ids=[key])
+
+        if path.exists():
+            path.unlink()
 
     # ------------------------------------------------------------------
     # Write
