@@ -373,5 +373,21 @@ def cost(history: int) -> None:
             click.echo(f"  {d['date']}  ${d['cost_usd']:.4f}")
 
 
+@cli.command()
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
+@click.option("--port", "-p", default=8080, show_default=True, help="Bind port.")
+@click.option("--reload", is_flag=True, default=False, help="Auto-reload on code changes (dev).")
+def serve(host: str, port: int, reload: bool) -> None:
+    """Start the AKS web UI.
+
+    Usage: aks serve
+           aks serve --port 3000 --reload
+    """
+    import uvicorn
+
+    click.echo(f"AKS web UI → http://{host}:{port}")
+    uvicorn.run("aks.web.app:app", host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     cli()

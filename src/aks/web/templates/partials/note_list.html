@@ -1,0 +1,12 @@
+{% if notes %}
+  {% for item in notes %}
+  <div class="group cursor-pointer hover:bg-surface-container-high/60 px-3 py-3 rounded-sm transition-all">
+    <p class="text-sm text-on-surface/80 group-hover:text-on-surface truncate leading-snug">{{ item.note.title }}</p>
+    <p class="font-label text-[10px] text-outline/40 mt-0.5 uppercase tracking-wide">{{ item.age }}</p>
+  </div>
+  {% endfor %}
+{% else %}
+  <p class="text-[10px] font-label uppercase tracking-widest text-outline/30 text-center py-10">
+    {% if q %}No matches{% else %}No notes yet{% endif %}
+  </p>
+{% endif %}

@@ -1,0 +1,38 @@
+<!-- User bubble -->
+<div class="flex justify-end">
+  <div class="max-w-[80%] bg-primary-container/20 border border-primary/10 text-on-surface px-4 py-3 rounded-xl rounded-tr-none text-sm leading-relaxed">
+    {{ message | e }}
+  </div>
+</div>
+
+<!-- AI response -->
+<div class="flex flex-col gap-2 items-start">
+
+  <!-- Agent badge (updated by JS on stream done) -->
+  <div id="badge-{{ task_id }}" class="flex items-center gap-2 mb-1">
+    <span class="px-2 py-0.5 bg-surface-container-highest rounded-full flex items-center gap-1.5 border border-outline-variant/20">
+      <span class="w-1.5 h-1.5 bg-primary/50 rounded-full animate-pulse"></span>
+      <span class="font-label text-[10px] uppercase tracking-tighter text-primary/50">routing…</span>
+    </span>
+  </div>
+
+  <!-- SSE streaming container -->
+  <div
+    id="ai-{{ task_id }}"
+    class="max-w-[90%] bg-surface-container-low border-l-2 border-primary/50 px-5 py-4 text-sm leading-relaxed min-w-[180px]"
+    hx-ext="sse"
+    sse-connect="/chat/stream/{{ task_id }}"
+    sse-swap="chunk"
+  >
+    <!-- Initial loading indicator (replaced by first chunk) -->
+    <div class="flex items-center gap-2 text-primary/40">
+      <span class="inline-flex gap-1">
+        <span class="w-1 h-1 bg-primary/50 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+        <span class="w-1 h-1 bg-primary/50 rounded-full animate-bounce" style="animation-delay:120ms"></span>
+        <span class="w-1 h-1 bg-primary/50 rounded-full animate-bounce" style="animation-delay:240ms"></span>
+      </span>
+      <span class="font-mono text-[10px] uppercase tracking-wider">Processing</span>
+    </div>
+  </div>
+
+</div>
