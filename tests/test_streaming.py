@@ -18,9 +18,6 @@ def _gemini_config() -> ModelConfig:
     return ModelConfig(model="gemini-test", max_tokens=256, temperature=0.0, provider="gemini")
 
 
-def _anthropic_config() -> ModelConfig:
-    return ModelConfig(model="claude-test", max_tokens=256, temperature=0.0, provider="anthropic")
-
 
 def _make_gemini_chunks(texts: list[str]) -> list[MagicMock]:
     chunks = []
@@ -80,37 +77,6 @@ class TestGeminiStream:
         client.models.generate_content_stream.return_value = []
         result = list(stream(client, _gemini_config(), "sys", [{"role": "user", "content": "hi"}]))
         assert result == []
-
-
-# ---------------------------------------------------------------------------
-# llm.stream() — Anthropic
-# ---------------------------------------------------------------------------
-
-class TestAnthropicStream:
-    def _make_client(self, texts: list[str]) -> MagicMock:
-        client = MagicMock()
-        ctx = MagicMock()
-        ctx.__enter__ = MagicMock(return_value=ctx)
-        ctx.__exit__ = MagicMock(return_value=False)
-        ctx.text_stream = iter(texts)
-        client.messages.stream.return_value = ctx
-        return client
-
-    def test_yields_text_chunks(self):
-        client = self._make_client(["Hi", " there", "!"])
-        result = list(stream(client, _anthropic_config(), "sys", [{"role": "user", "content": "hey"}]))
-        assert result == ["Hi", " there", "!"]
-
-    def test_empty_stream_yields_nothing(self):
-        client = self._make_client([])
-        result = list(stream(client, _anthropic_config(), "sys", [{"role": "user", "content": "hey"}]))
-        assert result == []
-
-    def test_context_manager_is_used(self):
-        client = self._make_client(["ok"])
-        list(stream(client, _anthropic_config(), "sys", [{"role": "user", "content": "q"}]))
-        client.messages.stream.return_value.__enter__.assert_called_once()
-        client.messages.stream.return_value.__exit__.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -139,33 +139,74 @@ def _append_history(role: str, content: str) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
+def _build_transcript(session: list[dict]) -> str:
+    """Format a list of {role, content} turns into a readable transcript."""
+    lines = []
+    for msg in session:
+        label = "**You**" if msg["role"] == "user" else "**AKS**"
+        lines.append(f"{label}: {msg['content'].strip()}\n")
+    return "\n".join(lines)
+
+
+def _save_session_as_note(session: list[dict]) -> None:
+    """Prompt the user and optionally save the chat session as a note."""
+    from datetime import datetime, timezone
+    from aks.knowledge.store import KnowledgeStore
+
+    if not session:
+        return
+
+    if not click.confirm("\nSave conversation as note?", default=False):
+        return
+
+    first_user = next((m["content"] for m in session if m["role"] == "user"), "chat")
+    short = first_user[:50].strip().rstrip("?.,")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    title = f"{timestamp} — {short}"
+
+    body = _build_transcript(session)
+    store = KnowledgeStore()
+    path = store.save_note(title=title, body=body, metadata={"type": "chat_session"})
+    click.echo(f"Saved → {path}")
+
+
 @cli.command()
-def chat() -> None:
+@click.option("--save", is_flag=True, default=False, help="Prompt to save the session as a note on exit.")
+def chat(save: bool) -> None:
     """Start an interactive multi-turn chat session."""
     orchestrator = _get_orchestrator()
     history = _load_history(max_messages=40)
+    session: list[dict] = []  # only turns from this session
 
     if history:
         click.echo(f"AKS Chat — resuming ({len(history) // 2} previous turn(s)). Ctrl+C to exit.\n")
     else:
         click.echo("AKS Chat — type your message. Ctrl+C to exit.\n")
 
-    while True:
-        query = click.prompt("you")
-        chain, _, chunks, _ = orchestrator.stream_chain(query, conversation_history=history)
+    try:
+        while True:
+            query = click.prompt("you")
+            chain, _, chunks, _ = orchestrator.stream_chain(query, conversation_history=history)
 
-        chain_str = " → ".join(chain)
-        click.echo(f"\n[{chain_str}] ", nl=False)
-        content = ""
-        for chunk in chunks:
-            click.echo(chunk, nl=False)
-            content += chunk
+            chain_str = " → ".join(chain)
+            click.echo(f"\n[{chain_str}] ", nl=False)
+            content = ""
+            for chunk in chunks:
+                click.echo(chunk, nl=False)
+                content += chunk
+            click.echo("\n")
+
+            history.append({"role": "user", "content": query})
+            history.append({"role": "assistant", "content": content})
+            session.append({"role": "user", "content": query})
+            session.append({"role": "assistant", "content": content})
+            _append_history("user", query)
+            _append_history("assistant", content)
+
+    except (KeyboardInterrupt, click.exceptions.Abort):
         click.echo("\n")
-
-        history.append({"role": "user", "content": query})
-        history.append({"role": "assistant", "content": content})
-        _append_history("user", query)
-        _append_history("assistant", content)
+        if save:
+            _save_session_as_note(session)
 
 
 def _import_url(url: str) -> tuple[str, str]:

@@ -1,35 +1,35 @@
-provider: "gemini"  # "gemini" | "anthropic" — switch here to change globally
+provider: "cerebras"  # primary provider — cerebras | gemini
 
 models:
   orchestrator:
-    model: "gemini-2.5-flash-lite"
+    model: "llama3.1-8b"        # fast + cheap for routing decisions
     max_tokens: 512
-    temperature: 0.0         # deterministic routing
-    pricing: {input_per_1m: 0.075, output_per_1m: 0.30}
+    temperature: 0.0            # deterministic routing
+    pricing: {input_per_1m: 0.10, output_per_1m: 0.10}
 
   code:
-    model: "gemini-2.5-flash-lite"
+    model: "llama3.1-8b"
     max_tokens: 4096
     temperature: 0.2
-    pricing: {input_per_1m: 0.075, output_per_1m: 0.30}
+    pricing: {input_per_1m: 0.85, output_per_1m: 1.20}
 
   pkm:
-    model: "gemini-2.5-flash-lite"
+    model: "llama3.1-8b"
     max_tokens: 4096
     temperature: 0.4
-    pricing: {input_per_1m: 0.075, output_per_1m: 0.30}
+    pricing: {input_per_1m: 0.85, output_per_1m: 1.20}
 
   writing:
-    model: "gemini-2.5-flash-lite"
+    model: "llama3.1-8b"
     max_tokens: 4096
     temperature: 0.6
-    pricing: {input_per_1m: 0.075, output_per_1m: 0.30}
+    pricing: {input_per_1m: 0.85, output_per_1m: 1.20}
 
   planning:
-    model: "gemini-2.5-flash-lite"
+    model: "llama3.1-8b"
     max_tokens: 2048
     temperature: 0.1
-    pricing: {input_per_1m: 0.075, output_per_1m: 0.30}
+    pricing: {input_per_1m: 0.85, output_per_1m: 1.20}
 
   # Embeddings always use Gemini regardless of provider
   embeddings:
@@ -38,8 +38,11 @@ models:
     dimensions: 3072
     pricing: {input_per_1m: 0.025, output_per_1m: 0.0}
 
-# --- Anthropic equivalents (swap provider above to use) ---
-# orchestrator: claude-haiku-4-5-20251001   pricing: {input_per_1m: 0.80, output_per_1m: 4.00}
-# code/pkm/writing: claude-sonnet-4-6       pricing: {input_per_1m: 3.00, output_per_1m: 15.00}
-# planning: claude-haiku-4-5-20251001       pricing: {input_per_1m: 0.80, output_per_1m: 4.00}
-# embeddings: text-embedding-3-small (provider: openai)
+# Tried in order when primary provider returns 429 / quota exhausted
+fallback_chain:
+  - provider: gemini
+    model: gemini-2.5-flash-lite
+
+# --- Provider reference ---
+# cerebras   orchestrator: llama3.1-8b     agents: llama3.1-8b
+# gemini     orchestrator: gemini-2.5-flash-lite
