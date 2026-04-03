@@ -38,3 +38,8 @@ htmlcov/
 
 # Logs
 *.log
+
+# Runtime data (generated, not source)
+cost.db
+chat_history.jsonl
+knowledge/notes/

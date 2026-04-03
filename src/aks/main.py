@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os as _os
+from pathlib import Path
 
 import click
 from dotenv import load_dotenv
@@ -106,13 +107,49 @@ def search(query: str) -> None:
         click.echo(f"  {r.snippet}")
 
 
+def _history_path():
+    from aks.utils.config import DATA_DIR
+    return DATA_DIR / "chat_history.jsonl"
+
+
+def _load_history(max_messages: int = 40) -> list[dict]:
+    import json
+    path = _history_path()
+    if not path.exists():
+        return []
+    lines = path.read_text().splitlines()
+    entries = []
+    for line in lines:
+        try:
+            entries.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    # keep last max_messages, strip timestamps for the conversation_history format
+    recent = entries[-max_messages:]
+    return [{"role": e["role"], "content": e["content"]} for e in recent]
+
+
+def _append_history(role: str, content: str) -> None:
+    import json
+    from datetime import datetime, timezone
+    path = _history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    entry = {"role": role, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()}
+    with path.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
 @cli.command()
 def chat() -> None:
     """Start an interactive multi-turn chat session."""
     orchestrator = _get_orchestrator()
-    history: list[dict] = []
+    history = _load_history(max_messages=40)
 
-    click.echo("AKS Chat — type your message. Ctrl+C to exit.\n")
+    if history:
+        click.echo(f"AKS Chat — resuming ({len(history) // 2} previous turn(s)). Ctrl+C to exit.\n")
+    else:
+        click.echo("AKS Chat — type your message. Ctrl+C to exit.\n")
+
     while True:
         query = click.prompt("you")
         chain, _, chunks, _ = orchestrator.stream_chain(query, conversation_history=history)
@@ -127,6 +164,94 @@ def chat() -> None:
 
         history.append({"role": "user", "content": query})
         history.append({"role": "assistant", "content": content})
+        _append_history("user", query)
+        _append_history("assistant", content)
+
+
+def _import_url(url: str) -> tuple[str, str]:
+    """Fetch URL and extract readable text. Returns (title, body)."""
+    import trafilatura
+    from urllib.parse import urlparse
+
+    downloaded = trafilatura.fetch_url(url)
+    if not downloaded:
+        raise click.ClickException(f"Could not fetch URL: {url}")
+
+    body = trafilatura.extract(downloaded, include_comments=False, include_tables=True)
+    if not body:
+        raise click.ClickException("Could not extract readable text from URL.")
+
+    # Try to get title from metadata
+    meta = trafilatura.extract_metadata(downloaded)
+    if meta and meta.title:
+        title = meta.title
+    else:
+        parsed = urlparse(url)
+        slug = parsed.path.rstrip("/").split("/")[-1] or parsed.netloc
+        title = f"{parsed.netloc} — {slug}"
+
+    return title, body
+
+
+def _import_pdf(path: Path) -> list[tuple[str, str]]:
+    """Extract text from PDF. Returns list of (title, body) — multiple if chunked."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(path))
+    base_title = path.stem.replace("-", " ").replace("_", " ").title()
+
+    # ~2000 tokens ≈ 8000 chars; collect pages into chunks
+    CHUNK_CHARS = 8000
+    chunks: list[str] = []
+    current = ""
+
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        if len(current) + len(text) > CHUNK_CHARS and current:
+            chunks.append(current.strip())
+            current = text
+        else:
+            current += "\n" + text
+
+    if current.strip():
+        chunks.append(current.strip())
+
+    if not chunks:
+        raise click.ClickException("Could not extract any text from PDF.")
+
+    if len(chunks) == 1:
+        return [(base_title, chunks[0])]
+    return [(f"{base_title} (part {i + 1})", chunk) for i, chunk in enumerate(chunks)]
+
+
+@cli.command(name="import")
+@click.argument("source")
+def import_source(source: str) -> None:
+    """Import a URL or PDF file as a note.
+
+    Usage:
+      aks import https://example.com/article
+      aks import ~/Downloads/paper.pdf
+    """
+    from aks.knowledge.store import KnowledgeStore
+
+    store = KnowledgeStore()
+
+    if source.startswith("http://") or source.startswith("https://"):
+        title, body = _import_url(source)
+        path = store.save_note(title=title, body=body, metadata={"source": source})
+        click.echo(f"Imported → {path}  ({len(body):,} chars)")
+    else:
+        file_path = Path(source).expanduser().resolve()
+        if not file_path.exists():
+            raise click.ClickException(f"File not found: {file_path}")
+        if file_path.suffix.lower() != ".pdf":
+            raise click.ClickException("Only .pdf files are supported for local import.")
+
+        parts = _import_pdf(file_path)
+        for title, body in parts:
+            path = store.save_note(title=title, body=body, metadata={"source": str(file_path)})
+            click.echo(f"Imported → {path}  ({len(body):,} chars)")
 
 
 @cli.command(name="list")

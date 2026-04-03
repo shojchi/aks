@@ -106,9 +106,36 @@ def _parse_chain(raw: str) -> list[str]:
     return parts
 
 
+_CHAIN_KEYWORD_RULES: list[tuple[frozenset[str], frozenset[str], str]] = [
+    # (must contain ANY of these, AND ANY of these) → chain
+    (frozenset({"document", "write docs", "write documentation", "explain"}),
+     frozenset({"function", "class", "code", "script", "method"}),
+     "code->writing"),
+    (frozenset({"blog post", "blog", "article", "write up", "write-up", "post about"}),
+     frozenset({"notes", "my notes", "research"}),
+     "pkm->writing"),
+    (frozenset({"email", "message", "report"}),
+     frozenset({"notes", "my notes", "summary", "summarize"}),
+     "pkm->writing"),
+    (frozenset({"plan", "learning plan", "roadmap", "schedule"}),
+     frozenset({"notes", "my notes", "based on"}),
+     "pkm->planning"),
+    (frozenset({"sprint", "breakdown", "plan"}),
+     frozenset({"codebase", "code", "repo", "architecture"}),
+     "code->planning"),
+]
+
+
 def _keyword_route(query: str) -> str | None:
-    """Fast keyword pre-filter. Returns agent name if confident, else None."""
+    """Fast keyword pre-filter. Returns agent name or chain if confident, else None."""
     q = query.lower()
+
+    # Chain detection takes priority over single-agent scoring.
+    for any_a, any_b, chain in _CHAIN_KEYWORD_RULES:
+        if any(kw in q for kw in any_a) and any(kw in q for kw in any_b):
+            if chain in VALID_CHAINS:
+                return chain
+
     scores: dict[str, int] = {name: 0 for name in ACTIVE_AGENTS}
     for name in ACTIVE_AGENTS:
         cfg = agent_config(name)
@@ -155,7 +182,8 @@ class Orchestrator:
             return [DEFAULT_AGENT]
         keyword_pick = _keyword_route(query)
         if keyword_pick:
-            return [keyword_pick]
+            parsed = _parse_chain(keyword_pick)
+            return parsed if parsed else [DEFAULT_AGENT]
         raw = complete(
             self.client,
             self._routing_config,
