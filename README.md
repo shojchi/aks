@@ -1,3 +1,6 @@
+<img width="890" height="594" alt="coezhqcjvtuwvdfm" src="https://github.com/user-attachments/assets/326b358a-abbf-4b70-a0e4-23d60113b875" />
+
+
 # Veles is Agent Knowledge System
 
 Personal AI assistant that routes queries to specialized agents, grounded in your Markdown notes. Available as a **CLI** and a **web UI**.
