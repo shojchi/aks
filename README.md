@@ -1,4 +1,4 @@
-# Veles is AKS — Agent Knowledge System
+# Veles is Agent Knowledge System
 
 Personal AI assistant that routes queries to specialized agents, grounded in your Markdown notes. Available as a **CLI** and a **web UI**.
 
