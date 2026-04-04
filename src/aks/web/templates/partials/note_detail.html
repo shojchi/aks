@@ -5,10 +5,10 @@
       <button class="shrink-0 ml-4 text-outline/30 hover:text-error transition-colors p-1 rounded"
               onclick="deleteNote('{{ note.path.stem }}', '{{ note.title | e }}')"
               title="Delete note">
-        <span class="material-symbols-outlined" style="font-size:18px;line-height:1">delete</span>
+        <span class="material-symbols-outlined" style="font-size:1.125rem;line-height:1">delete</span>
       </button>
     </div>
-    <p class="font-label text-[10px] text-outline/40 uppercase tracking-wide mb-8">{{ age }}</p>
+    <p class="font-label text-[0.625rem] text-outline/40 uppercase tracking-wide mb-8">{{ age }}</p>
     <div class="ai-prose note-md text-sm leading-relaxed" data-raw="{{ note.body | e }}"></div>
   </div>
 </div>
