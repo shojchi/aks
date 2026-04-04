@@ -14,6 +14,12 @@ dependencies = [
     "trafilatura>=1.12",
     "lxml_html_clean>=0.1",
     "pypdf>=4.0",
+    # Web UI (Phase 5)
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.1",
 ]
 
 [project.scripts]
@@ -25,7 +31,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aks"]
-include = ["src/aks/config/**"]
+include = ["src/aks/config/**", "src/aks/web/templates/**"]
 
 [tool.uv]
 dev-dependencies = [

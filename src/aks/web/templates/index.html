@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AKS</title>
+
+  <!-- Tailwind CDN with custom Obsidian Architect config -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+  <!-- HTMX SSE extension -->
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js" crossorigin="anonymous"></script>
+  <!-- Marked.js for client-side markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <!-- DOMPurify — sanitize marked output before injecting into DOM -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Material Symbols -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface":                    "#131313",
+            "surface-dim":                "#131313",
+            "surface-container-lowest":   "#0e0e0e",
+            "surface-container-low":      "#1c1b1b",
+            "surface-container":          "#20201f",
+            "surface-container-high":     "#2a2a2a",
+            "surface-container-highest":  "#353535",
+            "surface-bright":             "#393939",
+            "on-surface":                 "#e5e2e1",
+            "on-surface-variant":         "#cbc3d7",
+            "outline":                    "#958ea0",
+            "outline-variant":            "#494454",
+            "primary":                    "#d0bcff",
+            "primary-container":          "#a078ff",
+            "primary-fixed-dim":          "#d0bcff",
+            "on-primary":                 "#3c0091",
+            "on-primary-container":       "#340080",
+            "secondary":                  "#d0bcff",
+            "secondary-container":        "#513e7f",
+            "tertiary":                   "#ffb869",
+            "tertiary-container":         "#ca801e",
+            "error":                      "#ffb4ab",
+            "error-container":            "#93000a",
+          },
+          fontFamily: {
+            headline: ["Inter", "sans-serif"],
+            body:     ["Inter", "sans-serif"],
+            label:    ["Space Grotesk", "sans-serif"],
+            mono:     ["monospace"],
+          },
+          borderRadius: {
+            DEFAULT: "0.125rem",
+            lg:      "0.25rem",
+            xl:      "0.5rem",
+            full:    "0.75rem",
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Markdown rendering inside AI bubbles */
+    .ai-prose p                  { margin-bottom: 0.75rem; line-height: 1.7; }
+    .ai-prose p:last-child       { margin-bottom: 0; }
+    .ai-prose strong             { color: #d0bcff; font-weight: 600; }
+    .ai-prose em                 { color: #cbc3d7; }
+    .ai-prose code               { background: #2a2a2a; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8em; color: #d0bcff; font-family: monospace; }
+    .ai-prose pre                { background: #0e0e0e; padding: 1rem; border-radius: 0.25rem; overflow-x: auto; margin: 0.75rem 0; border: 1px solid rgba(73,68,84,0.3); }
+    .ai-prose pre code           { background: none; padding: 0; color: #e5e2e1; font-size: 0.85em; }
+    .ai-prose ul                 { list-style-type: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+    .ai-prose ol                 { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+    .ai-prose li                 { margin-bottom: 0.3rem; line-height: 1.6; }
+    .ai-prose h1                 { color: #e5e2e1; font-weight: 700; font-size: 1.2rem; margin: 1rem 0 0.5rem; }
+    .ai-prose h2                 { color: #e5e2e1; font-weight: 600; font-size: 1.05rem; margin: 0.875rem 0 0.4rem; }
+    .ai-prose h3                 { color: #cbc3d7; font-weight: 600; font-size: 0.95rem; margin: 0.75rem 0 0.35rem; }
+    .ai-prose blockquote         { border-left: 2px solid rgba(73,68,84,0.6); padding-left: 1rem; color: #958ea0; margin: 0.5rem 0; font-style: italic; }
+    .ai-prose a                  { color: #d0bcff; text-decoration: underline; text-underline-offset: 2px; }
+    .ai-prose hr                 { border-color: rgba(73,68,84,0.3); margin: 1rem 0; }
+    .htmx-indicator              { display: none; }
+    .htmx-request .htmx-indicator { display: inline-block; }
+    .htmx-request.htmx-indicator  { display: inline-block; }
+    .ai-prose table              { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.85em; }
+    .ai-prose th                 { background: #1c1b1b; padding: 0.5rem 0.75rem; text-align: left; color: #cbc3d7; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(73,68,84,0.3); }
+    .ai-prose td                 { padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(73,68,84,0.1); color: #e5e2e1; }
+    .ai-prose tr:last-child td   { border-bottom: none; }
+  </style>
+</head>
+
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container/30">
+
+<!-- Import modal overlay -->
+<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-surface/80 backdrop-blur-md p-4">
+  <div class="w-full max-w-lg bg-surface-container rounded-xl shadow-2xl border border-outline-variant/10 overflow-hidden">
+
+    <!-- Header -->
+    <div class="px-6 py-5 flex items-center justify-between border-b border-outline-variant/10">
+      <h2 class="text-lg font-headline font-semibold text-on-surface">Import to Knowledge Base</h2>
+      <button
+        onclick="closeImportModal()"
+        class="p-1 hover:bg-surface-container-high rounded-full transition-colors text-outline hover:text-on-surface"
+      >
+        <span class="material-symbols-outlined text-xl">close</span>
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-outline-variant/10">
+      <button
+        id="tab-url"
+        onclick="switchTab('url')"
+        class="flex-1 py-4 text-sm font-medium border-b-2 border-primary text-primary transition-all"
+      >
+        URL
+      </button>
+      <button
+        id="tab-file"
+        onclick="switchTab('file')"
+        class="flex-1 py-4 text-sm font-medium text-outline hover:text-on-surface transition-all border-b-2 border-transparent"
+      >
+        File
+      </button>
+    </div>
+
+    <!-- URL tab -->
+    <div id="tab-content-url" class="p-8 space-y-6">
+      <form
+        id="import-url-form"
+        hx-post="/import"
+        hx-target="#note-list"
+        hx-swap="innerHTML"
+        hx-indicator="#import-spinner"
+        hx-on::after-request="if(event.detail.successful) closeImportModal();"
+        class="space-y-6"
+      >
+        <div class="space-y-2">
+          <label class="block text-xs font-label uppercase tracking-widest text-outline">Paste a URL</label>
+          <input
+            type="url"
+            name="url"
+            placeholder="https://..."
+            required
+            class="w-full bg-surface-container-lowest border-none ring-1 ring-outline-variant/20 rounded-lg px-4 py-3 text-on-surface placeholder:text-outline/50 focus:ring-2 focus:ring-primary/40 focus:outline-none transition-all text-sm"
+          />
+          <p class="text-[11px] text-outline italic">We'll extract readable text from the page.</p>
+        </div>
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onclick="closeImportModal()"
+            class="px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="px-8 py-2 text-sm font-semibold bg-primary-container text-on-primary rounded-lg hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary-container/20 flex items-center gap-2"
+          >
+            <span id="import-spinner" class="htmx-indicator animate-spin material-symbols-outlined text-sm">progress_activity</span>
+            Import
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- File tab -->
+    <div id="tab-content-file" class="hidden p-8">
+      <form
+        id="import-file-form"
+        hx-post="/import/pdf"
+        hx-target="#note-list"
+        hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        hx-on::after-request="if(event.detail.successful) closeImportModal();"
+        class="space-y-6"
+      >
+        <label
+          for="file-input"
+          class="border-2 border-dashed border-outline-variant/30 rounded-xl p-12 flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-all cursor-pointer group"
+        >
+          <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center group-hover:bg-primary-container/10 transition-colors">
+            <span class="material-symbols-outlined text-outline group-hover:text-primary">upload_file</span>
+          </div>
+          <div class="text-center">
+            <p class="text-sm font-medium text-on-surface-variant">Drop a PDF here or click to browse</p>
+            <p class="font-label text-[10px] text-outline uppercase tracking-wider mt-1">PDF only · max 50 MB</p>
+          </div>
+          <input id="file-input" type="file" name="file" accept=".pdf" class="hidden" onchange="updateFileLabel(this)" />
+        </label>
+        <p id="file-label" class="text-xs text-outline text-center hidden"></p>
+        <div class="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onclick="closeImportModal()"
+            class="px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-high rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="px-8 py-2 text-sm font-semibold bg-primary-container text-on-primary rounded-lg hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary-container/20"
+          >
+            Import
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<main class="flex h-screen overflow-hidden">
+
+  <!-- ==================================================================
+       LEFT COLUMN — Knowledge Base (240 px)
+       ================================================================== -->
+  <aside class="w-[240px] bg-surface-container-low flex flex-col border-r border-outline-variant/20 shrink-0">
+
+    <div class="p-4 space-y-4">
+      <h2 class="font-label text-xs uppercase tracking-widest text-on-surface/40">Knowledge Base</h2>
+
+      <!-- Action buttons -->
+      <div class="flex gap-2">
+        <button
+          disabled
+          class="flex-1 text-[10px] uppercase font-label bg-surface-container-high text-on-surface/25 px-3 py-2 rounded flex items-center justify-center gap-1.5 cursor-not-allowed border border-outline-variant/10"
+        >
+          <span class="material-symbols-outlined text-sm">add</span>
+          New
+        </button>
+        <button
+          onclick="openImportModal()"
+          class="flex-1 text-[10px] uppercase font-label bg-surface-container-high text-on-surface px-3 py-2 rounded flex items-center justify-center gap-1.5 hover:bg-surface-bright transition-all active:scale-95 border border-outline-variant/20"
+        >
+          <span class="material-symbols-outlined text-sm">upload_file</span>
+          Import
+        </button>
+      </div>
+
+      <!-- Live search -->
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-outline/60">search</span>
+        <input
+          type="text"
+          name="q"
+          placeholder="Search notes..."
+          autocomplete="off"
+          class="w-full bg-surface-container-lowest border-none rounded-lg pl-9 pr-4 py-2.5 text-xs text-on-surface placeholder:text-outline/50 focus:outline-none focus:ring-1 focus:ring-primary/20"
+          hx-get="/notes"
+          hx-trigger="keyup changed delay:300ms"
+          hx-target="#note-list"
+        />
+      </div>
+    </div>
+
+    <!-- Note list (HTMX-swappable) -->
+    <div id="note-list" class="flex-1 overflow-y-auto no-scrollbar px-2 pb-4 space-y-1">
+      {% include "partials/note_list.html" %}
+    </div>
+
+  </aside>
+
+  <!-- ==================================================================
+       CENTER COLUMN — Chat (flex-1)
+       ================================================================== -->
+  <section class="flex-1 bg-surface-container flex flex-col relative overflow-hidden">
+
+    <!-- Messages -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto px-8 py-8 space-y-8 no-scrollbar">
+      {% if not history %}
+      <!-- Empty state -->
+      <div class="flex flex-col items-center justify-center h-full text-center gap-4 opacity-40 select-none">
+        <span class="material-symbols-outlined text-5xl text-primary/50">psychology</span>
+        <p class="font-label text-xs uppercase tracking-widest text-outline/60">Ask anything about your knowledge base</p>
+      </div>
+      {% else %}
+      {% for turn in history %}
+
+        {% if turn.role == "user" %}
+        <!-- User bubble -->
+        <div class="flex justify-end">
+          <div class="max-w-[80%] bg-primary-container/20 border border-primary/10 text-on-surface px-4 py-3 rounded-xl rounded-tr-none text-sm leading-relaxed">
+            {{ turn.content | e }}
+          </div>
+        </div>
+
+        {% else %}
+        <!-- AI bubble (history — rendered as markdown via JS on load) -->
+        <div class="flex flex-col gap-2 items-start">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="px-2 py-0.5 bg-surface-container-highest rounded-full flex items-center gap-1.5 border border-outline-variant/20">
+              <span class="w-1.5 h-1.5 bg-primary rounded-full"></span>
+              <span class="font-label text-[10px] uppercase tracking-tighter text-primary">aks</span>
+            </span>
+          </div>
+          <div class="ai-prose history-md max-w-[90%] bg-surface-container-low border-l-2 border-primary px-5 py-4 text-sm leading-relaxed"
+               data-raw="{{ turn.content | e }}"></div>
+        </div>
+        {% endif %}
+
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Input area -->
+    <div class="p-6 bg-gradient-to-t from-surface-container via-surface-container to-transparent shrink-0">
+      <div class="max-w-4xl mx-auto bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-3 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+        <!-- Meta row -->
+        <div class="flex items-center gap-2 mb-2 px-1">
+          <div class="px-2 py-1 bg-surface-container-high rounded flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-xs text-primary">smart_toy</span>
+            <span class="font-label text-[10px] uppercase text-on-surface/70">auto agent</span>
+          </div>
+          <div class="h-3 w-px bg-outline-variant/20 mx-1"></div>
+          <span class="font-label text-[10px] uppercase text-outline/40">knowledge base active</span>
+        </div>
+        <!-- Form -->
+        <form
+          hx-post="/chat"
+          hx-target="#chat-messages"
+          hx-swap="beforeend"
+          hx-on::after-request="this.reset(); scrollToBottom();"
+          class="flex items-end gap-3"
+        >
+          <textarea
+            name="message"
+            rows="1"
+            placeholder="Message AKS..."
+            class="flex-1 bg-transparent border-none focus:ring-0 text-sm resize-none py-1 placeholder:text-outline/40 text-on-surface"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.closest('form').requestSubmit();}"
+          ></textarea>
+          <button
+            type="submit"
+            class="bg-primary-container p-2 rounded-xl text-on-primary active:scale-95 transition-transform hover:brightness-110"
+          >
+            <span class="material-symbols-outlined">arrow_upward</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================================================================
+       RIGHT COLUMN — System Intelligence (240 px)
+       ================================================================== -->
+  <aside class="w-[240px] bg-surface-container-low border-l border-outline-variant/20 flex flex-col shrink-0">
+    <div
+      id="status-panel"
+      class="p-6 space-y-8 overflow-y-auto no-scrollbar flex-1"
+      hx-get="/status"
+      hx-trigger="every 6s"
+      hx-swap="innerHTML"
+    >
+      {% include "partials/status_panel.html" %}
+    </div>
+  </aside>
+
+</main>
+
+<script>
+  // ----------------------------------------------------------------
+  // Import modal
+  // ----------------------------------------------------------------
+  function openImportModal() {
+    document.getElementById('import-modal').classList.remove('hidden');
+    switchTab('url');
+  }
+  function closeImportModal() {
+    document.getElementById('import-modal').classList.add('hidden');
+    document.getElementById('import-url-form').reset();
+    document.getElementById('import-file-form').reset();
+    document.getElementById('file-label').classList.add('hidden');
+  }
+  // Close on backdrop click
+  document.getElementById('import-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeImportModal();
+  });
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeImportModal();
+  });
+
+  function switchTab(tab) {
+    const isUrl = tab === 'url';
+    document.getElementById('tab-content-url').classList.toggle('hidden', !isUrl);
+    document.getElementById('tab-content-file').classList.toggle('hidden', isUrl);
+    document.getElementById('tab-url').className =
+      'flex-1 py-4 text-sm font-medium border-b-2 transition-all ' +
+      (isUrl ? 'border-primary text-primary' : 'border-transparent text-outline hover:text-on-surface');
+    document.getElementById('tab-file').className =
+      'flex-1 py-4 text-sm font-medium border-b-2 transition-all ' +
+      (!isUrl ? 'border-primary text-primary' : 'border-transparent text-outline hover:text-on-surface');
+  }
+
+  function updateFileLabel(input) {
+    const label = document.getElementById('file-label');
+    if (input.files.length) {
+      label.textContent = input.files[0].name;
+      label.classList.remove('hidden');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Marked config
+  // ----------------------------------------------------------------
+  marked.setOptions({ breaks: true, gfm: true });
+
+  // ----------------------------------------------------------------
+  // Render markdown for history items on page load
+  // ----------------------------------------------------------------
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.history-md[data-raw]').forEach(el => {
+      el.innerHTML = DOMPurify.sanitize(marked.parse(el.dataset.raw || ''));
+      delete el.dataset.raw;
+    });
+    scrollToBottom();
+  });
+
+  // ----------------------------------------------------------------
+  // SSE done handler
+  // ----------------------------------------------------------------
+  document.addEventListener('htmx:sseMessage', (e) => {
+    if (e.detail.type !== 'done') return;
+
+    let data = {};
+    try { data = JSON.parse(e.detail.data); } catch (_) {}
+
+    const wrapper = e.detail.elt;
+
+    // Close the EventSource cleanly before removing element.
+    const internals = wrapper['htmx-internal-data'];
+    if (internals?.sseEventSource) internals.sseEventSource.close();
+
+    // Update agent badge — build with DOM APIs so data.chain is never parsed as HTML.
+    const taskId = wrapper.id.slice(3); // strip "ai-"
+    const badge = document.getElementById('badge-' + taskId);
+    if (badge && data.chain) {
+      const outer = document.createElement('span');
+      outer.className = 'px-2 py-0.5 bg-surface-container-highest rounded-full flex items-center gap-1.5 border border-outline-variant/20';
+      const dot = document.createElement('span');
+      dot.className = 'w-1.5 h-1.5 bg-primary rounded-full';
+      const label = document.createElement('span');
+      label.className = 'font-label text-[10px] uppercase tracking-tighter text-primary';
+      label.textContent = data.chain;
+      outer.append(dot, label);
+      badge.replaceChildren(outer);
+    }
+
+    // Build final bubble and replace SSE element.
+    const finalDiv = document.createElement('div');
+    finalDiv.className = 'ai-prose max-w-[90%] bg-surface-container-low border-l-2 border-primary px-5 py-4 text-sm leading-relaxed';
+    finalDiv.innerHTML = DOMPurify.sanitize(marked.parse(data.content || ''));
+    wrapper.replaceWith(finalDiv);
+  });
+
+  // ----------------------------------------------------------------
+  // SSE error handler
+  // ----------------------------------------------------------------
+  document.addEventListener('htmx:sseMessage', (e) => {
+    if (e.detail.type !== 'error') return;
+    const wrapper = e.detail.elt;
+    const p = document.createElement('p');
+    p.className = 'text-error text-xs font-mono';
+    p.textContent = 'Error: ' + e.detail.data;
+    wrapper.replaceChildren(p);
+  });
+
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
+  function scrollToBottom() {
+    const el = document.getElementById('chat-messages');
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  document.addEventListener('htmx:afterSwap', (e) => {
+    if (e.detail.target?.id === 'chat-messages') scrollToBottom();
+  });
+</script>
+
+</body>
+</html>
