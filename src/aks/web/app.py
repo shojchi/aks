@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import asyncio
 import html as html_lib
+import ipaddress
 import json
 import queue
+import socket
 import threading
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
+from urllib.parse import urljoin, urlparse
 
 from fastapi import Cookie, FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse
@@ -17,6 +21,99 @@ from fastapi.templating import Jinja2Templates
 from sse_starlette.sse import EventSourceResponse
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+# ---------------------------------------------------------------------------
+# SSRF guard
+# ---------------------------------------------------------------------------
+
+def _is_public_host(hostname: str) -> bool:
+    """Return True only if every resolved IP for *hostname* is a public unicast address."""
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+    if not infos:
+        return False
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            return False
+        if (
+            ip.is_loopback
+            or ip.is_private
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_unspecified
+            or ip.is_reserved
+        ):
+            return False
+    return True
+
+
+def _validate_import_url(raw: str) -> str | None:
+    """Validate *raw* for use as an import URL.
+
+    Returns a normalised URL string on success, or None if the URL should be
+    rejected.  Checks:
+      - scheme must be http or https
+      - hostname must resolve exclusively to public IP addresses (SSRF guard)
+    """
+    try:
+        parsed = urlparse(raw)
+    except Exception:  # noqa: BLE001
+        return None
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    hostname = parsed.hostname
+    if not hostname:
+        return None
+    if not _is_public_host(hostname):
+        return None
+    return raw
+
+
+# Suppress urllib's automatic redirect-following so we can validate each hop.
+class _NoAutoRedirect(urllib.request.HTTPErrorProcessor):
+    def http_response(self, request, response):  # type: ignore[override]
+        return response
+
+    https_response = http_response
+
+
+def _safe_fetch(url: str, max_redirects: int = 5) -> str | None:
+    """Fetch *url* following only validated redirects (SSRF-safe).
+
+    Validates the scheme and resolved IPs at every hop before connecting.
+    Returns the decoded response body on HTTP 200, or None on any failure.
+    """
+    current = url
+    for _ in range(max_redirects + 1):
+        if not _validate_import_url(current):
+            return None
+        req = urllib.request.Request(
+            current,
+            headers={"User-Agent": "AKS/1.0 (import)"},
+        )
+        try:
+            opener = urllib.request.build_opener(_NoAutoRedirect)
+            with opener.open(req, timeout=15) as resp:
+                status = resp.status
+                if status in (301, 302, 303, 307, 308):
+                    location = resp.headers.get("Location", "")
+                    if not location:
+                        return None
+                    current = urljoin(current, location)
+                    continue
+                if status == 200:
+                    raw = resp.read(5 * 1024 * 1024)  # 5 MB cap
+                    charset = resp.headers.get_content_charset() or "utf-8"
+                    return raw.decode(charset, errors="replace")
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+    return None  # exceeded max_redirects
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app = FastAPI(title="AKS", docs_url=None, redoc_url=None)
@@ -226,8 +323,16 @@ async def import_url(request: Request, url: str = Form(...)):
     from aks.knowledge.store import KnowledgeStore
     import trafilatura
 
+    if not _validate_import_url(url):
+        return HTMLResponse(
+            '<p class="text-xs text-error font-label uppercase px-3 py-2">Invalid or disallowed URL.</p>',
+            status_code=422,
+        )
+
     store = KnowledgeStore()
-    downloaded = trafilatura.fetch_url(url)
+    # Use _safe_fetch instead of trafilatura.fetch_url — the latter follows
+    # redirects internally without validating each hop (SSRF via open redirect).
+    downloaded = _safe_fetch(url)
     if not downloaded:
         return HTMLResponse(
             '<p class="text-xs text-error font-label uppercase px-3 py-2">Could not fetch URL.</p>',
