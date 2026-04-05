@@ -428,6 +428,28 @@ async def import_pdf_file(request: Request):
     )
 
 
+@app.get("/note/new", response_class=HTMLResponse)
+async def note_new(request: Request):
+    return templates.TemplateResponse(request, "partials/note_editor.html", {})
+
+
+@app.post("/note", response_class=HTMLResponse)
+async def note_create(request: Request, title: str = Form(...), body: str = Form(...)):
+    from aks.knowledge.store import KnowledgeStore
+
+    store = KnowledgeStore()
+    note_path = store.save_note(title=title, body=body)
+
+    raw_notes = store.list_notes()
+    notes = [{"note": n, "age": _note_age(n.path)} for n in raw_notes]
+    resp = templates.TemplateResponse(
+        request, "partials/note_list.html", {"notes": notes, "q": ""}
+    )
+    resp.headers["X-New-Note-Slug"] = note_path.stem
+    resp.headers["X-New-Note-Title"] = title
+    return resp
+
+
 @app.get("/note/{slug}", response_class=HTMLResponse)
 async def note_detail(request: Request, slug: str):
     from aks.knowledge.store import KnowledgeStore

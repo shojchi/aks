@@ -279,8 +279,8 @@
       <!-- Action buttons -->
       <div class="flex gap-2">
         <button
-          disabled
-          class="flex-1 text-[0.725rem] uppercase font-label bg-surface-container-high text-on-surface/25 px-3 py-2 rounded flex items-center justify-center gap-1.5 cursor-not-allowed border border-outline-variant/10"
+          onclick="openNewNoteTab()"
+          class="flex-1 text-[0.725rem] uppercase font-label bg-surface-container-high text-on-surface px-3 py-2 rounded flex items-center justify-center gap-1.5 hover:bg-surface-bright transition-all active:scale-95 border border-outline-variant/20"
         >
           <span class="material-symbols-outlined text-sm">add</span>
           New
@@ -515,6 +515,56 @@
     if (tab) tab.remove();
     if (panel) panel.remove();
     if (_activeTab === noteId) switchToTab('chat');
+  }
+
+  function openNewNoteTab() {
+    const tabId = 'new-note';
+    if (document.getElementById('tab-' + tabId)) {
+      switchToTab(tabId);
+      return;
+    }
+
+    fetch('/note/new')
+      .then(r => r.text())
+      .then(html => {
+        const tabBar = document.getElementById('tab-bar');
+        const tab = document.createElement('div');
+        tab.id = 'tab-' + tabId;
+        tab.className = 'tab-item';
+        tab.onclick = () => switchToTab(tabId);
+
+        const label = document.createElement('span');
+        label.className = 'max-w-[140px] truncate';
+        label.textContent = 'New Note';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'tab-close';
+        closeBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:0.875rem;line-height:1">close</span>';
+        closeBtn.onclick = (e) => { e.stopPropagation(); closeTab(tabId); };
+
+        tab.append(label, closeBtn);
+        tabBar.appendChild(tab);
+
+        const panels = document.getElementById('tab-panels');
+        const panel = document.createElement('div');
+        panel.id = 'panel-' + tabId;
+        panel.className = 'tab-panel';
+        panel.innerHTML = html;
+        panels.appendChild(panel);
+
+        htmx.process(panel);
+        switchToTab(tabId);
+      });
+  }
+
+  function onNewNoteSaved(event) {
+    const xhr = event.detail.xhr;
+    const slug = xhr.getResponseHeader('X-New-Note-Slug');
+    const title = xhr.getResponseHeader('X-New-Note-Title');
+    closeTab('new-note');
+    if (slug && title) {
+      openNoteTab(slug, title);
+    }
   }
 
   async function deleteNote(slug, title) {

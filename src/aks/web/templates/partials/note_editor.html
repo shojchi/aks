@@ -1,0 +1,43 @@
+<div class="overflow-y-auto px-8 py-8 no-scrollbar flex-1">
+  <div class="max-w-3xl mx-auto">
+    <form
+      hx-post="/note"
+      hx-target="#note-list"
+      hx-swap="innerHTML"
+      hx-on::after-request="if(event.detail.successful) onNewNoteSaved(event)"
+      class="space-y-6"
+    >
+      <input
+        type="text"
+        name="title"
+        placeholder="Note title"
+        required
+        autofocus
+        class="w-full bg-transparent border-none text-xl font-headline font-semibold text-on-surface placeholder:text-outline/30 focus:outline-none"
+      />
+      <textarea
+        name="body"
+        placeholder="Write your note in markdown..."
+        required
+        rows="20"
+        class="w-full bg-surface-container-lowest rounded-lg px-4 py-3 text-sm text-on-surface leading-relaxed placeholder:text-outline/30 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-y border border-outline-variant/15"
+      ></textarea>
+      <div class="flex gap-3">
+        <button
+          type="submit"
+          class="text-[0.725rem] uppercase font-label bg-primary text-on-primary px-5 py-2 rounded flex items-center gap-1.5 hover:bg-primary/80 transition-all active:scale-95"
+        >
+          <span class="material-symbols-outlined text-sm">save</span>
+          Save
+        </button>
+        <button
+          type="button"
+          onclick="closeTab('new-note')"
+          class="text-[0.725rem] uppercase font-label bg-surface-container-high text-on-surface/60 px-5 py-2 rounded flex items-center gap-1.5 hover:bg-surface-bright transition-all active:scale-95 border border-outline-variant/15"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
